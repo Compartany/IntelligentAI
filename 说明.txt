@@ -1,11 +1,11 @@
 MOD：Intelligent AI
 作者：Compartany
 版本：见【version.txt】
-基于：Into the Breach v1.2.24，Mod Loader v2.6.3
+基于：Into the Breach v1.2.24，Mod Loader v2.6.3，modApiExt v1.14
 代码：https://github.com/Compartany/IntelligentAI
 链接：
-    [CN] TODO
-    [EN] TODO
+    [CN] https://www.bilibili.com/read/cv13990559
+    [EN] http://subsetgames.com/forum/viewtopic.php?f=25&t=38195
 下载：
     [github] https://github.com/Compartany/IntelligentAI/releases
     [weiyun] https://share.weiyun.com/7laJWpe3 （备用）

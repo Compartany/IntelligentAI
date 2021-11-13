@@ -1,11 +1,11 @@
 MOD: Intelligent AI
 Author: Compartany
 Version: See [version.txt]
-Base: Into the Breach v1.2.24, Mod Loader v2.6.3
+Base: Into the Breach v1.2.24, Mod Loader v2.6.3, modApiExt v1.14
 Code: https://github.com/Compartany/IntelligentAI
 Link:
-    [EN] TODO
-    [CN] TODO
+    [EN] http://subsetgames.com/forum/viewtopic.php?f=25&t=38195
+    [CN] https://www.bilibili.com/read/cv13990559
 Download:
     [github] https://github.com/Compartany/IntelligentAI/releases
     [weiyun] https://share.weiyun.com/7laJWpe3 (alternate)
@@ -35,7 +35,7 @@ How it works:
     - Move to A.C.I.D. tile
     - Move to tile near negative score area
     - Move to tile near TERRAIN_MOUNTAIN
-- Other
+- Others
     - Consider tiles around the target tile when attacking (to ensure that it can still deal effective attacks after being moved if possible)
     - Consider the amount of damage when attacking buildings
     - Optimize the handling of mechanisms involving Frozen, A.C.I.D., Shield, Armor, etc.
