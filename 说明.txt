@@ -1,0 +1,50 @@
+MOD：Intelligent AI
+作者：Compartany
+版本：见【version.txt】
+基于：Into the Breach v1.2.24，Mod Loader v2.6.3
+代码：https://github.com/Compartany/IntelligentAI
+链接：
+    [CN] TODO
+    [EN] TODO
+下载：
+    [github] https://github.com/Compartany/IntelligentAI/releases
+    [weiyun] https://share.weiyun.com/7laJWpe3 （备用）
+本人制作的 MOD：
+    https://github.com/Compartany/ITB-MODs/blob/main/mod-list.md
+
+你是否觉得敌人 AI 太低使得游戏过于简单？这个 MOD 会彻底改变这一切。
+
+你可以自定义难度系数，或直接游玩 [V. Hard] 或 [Imposs.] 难度。
+
+工作原理：
+
+- 概率增加
+    - 攻击特殊单位、特殊建筑
+    - 缠绕攻击以无法行动的单位为目标（如在水中无法行动的地面机甲）
+    - 缠绕攻击以远程类、科学类机甲为目标
+    - 移动至地图边缘、角落
+    - 移动至地图上方
+    - 移动至建筑之间
+    - 飞行单位移动至 TERRAIN_WATER、TERRAIN_HOLE 附近
+- 概率降低
+    - 非缠绕攻击以单位为目标
+    - 单位团聚现象
+    - 误伤友军
+    - 移动至环境上
+    - 移动至危险物体上
+    - 移动至 A.C.I.D. 上
+    - 移动至负分区域附近
+    - 移动至山岭附近
+- 其他
+    - 攻击时考虑目标周围的方格（尽可能保证被位移后依然能造成有效攻击）
+    - 攻击时考虑对建筑造成的伤害量
+    - 优化涉及冰冻、A.C.I.D.、护盾、装甲等机制的处理
+    - 优化爆卵虫的目标锁定 AI
+    - 优化蜘蛛的目标锁定 AI
+
+使用：
+1. 解压 MOD 加载器至游戏目录（https://subsetgames.com/forum/viewtopic.php?f=26&p=117100）
+2. 将 MOD 解压至【mods】目录下（本文件路径应该为【%游戏目录%/mods/EnvManipulators/说明.txt】）
+3. 运行游戏
+4. 在【Configure Mods】中启用 MOD
+5. 如果无法生效，请重启游戏
