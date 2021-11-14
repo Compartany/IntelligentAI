@@ -36,11 +36,14 @@ How it works:
     - Move to tile near negative score area
     - Move to tile near TERRAIN_MOUNTAIN
 - Others
-    - Consider tiles around the target tile when attacking (to ensure that it can still deal effective attacks after being moved if possible)
-    - Consider the amount of damage when attacking buildings
+    - More position oriented when targeting
+    - Consider tiles around the target tile when targeting (to ensure that it can still deal effective attacks after being moved if possible)
+    - Consider the amount of damage when targeting buildings
     - Optimize the handling of mechanisms involving Frozen, A.C.I.D., Shield, Armor, etc.
     - Optimize Blobber targeting AI
     - Optimize Spider targeting AI
+    - Optimize Centipede targeting AI
+    - Optimize Psion positioning AI
 
 Use:
 1. Extract Mod Loader to game directory (https://subsetgames.com/forum/viewtopic.php?f=26&p=117100)

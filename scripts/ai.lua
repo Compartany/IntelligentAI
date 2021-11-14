@@ -1,4 +1,6 @@
-local this = {}
+local this = {
+    positionFactor = 0.2
+}
 
 function this:Load(options)
     self.options = options
@@ -19,11 +21,13 @@ function this:Load(options)
     end)
 end
 
-function this:LogTargetInfo(target, damageScore, grappleScore)
+function this:LogTargetInfo(target, damageScore, grappleScore, positionScore)
     if self.options.opt_debug.value == "TARGET" or self.options.opt_debug.value == "ALL" then
-        if damageScore > 0 or grappleScore > 0 then
-            LOG(string.format("%s->%s: %.2f + %.2f = %.2f", Pawn:GetString(), target:GetString(), damageScore,
-                grappleScore, damageScore + grappleScore))
+        local sum1 = damageScore + grappleScore
+        local sum2 = sum1 + positionScore
+        if sum1 > 0 then
+            LOG(string.format("%s->%s: %d + %d + %d = (%d, %d)", Pawn:GetString(), target:GetString(), damageScore,
+                grappleScore, positionScore, sum1, sum2))
         end
     end
 end
@@ -31,7 +35,7 @@ end
 function this:LogPositionInfo(target, pawn, score)
     if self.options.opt_debug.value == "POSITION" or self.options.opt_debug.value == "ALL" then
         if score > 0 then
-            LOG(string.format("%s<-%s: %.2f", target:GetString(), pawn:GetString(), score))
+            LOG(string.format("%s<-%s: %d", target:GetString(), pawn:GetString(), score))
         end
     end
 end
@@ -125,7 +129,7 @@ function this:Skill_ScoreList(skill, list, queued)
                                 score = score + self:Skill_ScoreList_Target(skill, loc, damage, false) * 0.1
                             end
                         end
-                        -- else distance == 0，一般就是岩虫，不额外计算
+                        -- else distance == 0，自伤不额外计算
                     end
                 end
             end
@@ -135,7 +139,7 @@ function this:Skill_ScoreList(skill, list, queued)
             end
         end
     end
-    if posScore <= -5 then
+    if posScore <= -50 then
         -- 位置太差时拒绝攻击
         score = posScore
     end
@@ -147,10 +151,10 @@ function this:Skill_ScoreList_Target(skill, target, damage, grapple)
     if Board:GetPawnTeam(target) == Pawn:GetTeam() and damage > 0 then
         if Board:IsFrozen(target) and not Board:IsTargeted(target) then
             -- 大幅降低解冻冰冻友军的分数
-            score = skill.ScoreEnemy * 0.25
+            score = skill.ScoreEnemy * 6
         else
             -- 大幅增加攻击友军的负分数，对 AOE 敌人而言虽偶有神效，但这种情况一般都是坑自己人
-            score = skill.ScoreFriendlyDamage * 3
+            score = skill.ScoreFriendlyDamage * 30
         end
     elseif isEnemy(Board:GetPawnTeam(target), Pawn:GetTeam()) then
         local pawn = Board:GetPawn(target)
@@ -158,9 +162,9 @@ function this:Skill_ScoreList_Target(skill, target, damage, grapple)
             -- 不要攻击已毁坏敌人或被冰冻敌人
             score = skill.ScoreNothing
         else
-            if grapple then
+            if grapple and not pawn:IsIgnoreWeb() then
                 -- 缠绕敌人加分，并确保 缠绕 + 攻击 组合倍率与攻击 2 血建筑一致
-                score = skill.ScoreEnemy * 1.5
+                score = skill.ScoreEnemy * 15
 
                 local terrain = Board:GetTerrain(target)
                 if (not pawn:IsFlying() and terrain == TERRAIN_WATER) or
@@ -178,10 +182,10 @@ function this:Skill_ScoreList_Target(skill, target, damage, grapple)
             elseif damage > 0 then
                 if pawn:GetTeam() == TEAM_PLAYER and not pawn:IsMech() and pawn:GetMoveSpeed() == 0 then
                     -- 不可动的 TEAM_PLAYER 非 Mech 单位是任务单位
-                    score = skill.ScoreEnemy * 2.5
+                    score = skill.ScoreEnemy * 25
                 else
                     -- 降低攻击敌人这一行为的分数
-                    score = skill.ScoreEnemy * 0.5
+                    score = skill.ScoreEnemy * 5
                 end
 
                 if pawn:IsShield() then
@@ -200,17 +204,17 @@ function this:Skill_ScoreList_Target(skill, target, damage, grapple)
         local tile = intelAI_modApiExt.board:getTileTable(target)
         if tile and tile.shield then
             -- 降低攻击受护盾保护建筑的分数
-            score = skill.ScoreBuilding * 0.25
+            score = skill.ScoreBuilding * 2.5
         else
             if this:IsSpecialBuilding(target) then
                 -- 重点对待特殊建筑
-                score = skill.ScoreBuilding * 2.5
+                score = skill.ScoreBuilding * 25
             else
                 -- 考虑建筑血量
                 if damage > 1 and intelAI_modApiExt.board:getTileHealth(target) > 1 then
-                    score = skill.ScoreBuilding * 2
+                    score = skill.ScoreBuilding * 20
                 else
-                    score = skill.ScoreBuilding
+                    score = skill.ScoreBuilding * 10
                 end
             end
         end
@@ -221,66 +225,65 @@ function this:Skill_ScoreList_Target(skill, target, damage, grapple)
 end
 
 function this:ScorePositioning(point, pawn)
-    if Board:IsPod(point) then
-        return -10
-    end
     local score = self:ScorePositioningAvoid(point, pawn)
-    if score <= -5 then
-        return score
+    if score <= -50 then
+        return -100
+    end
+    if _G[pawn:GetType()].Leader ~= LEADER_NONE then
+        return point.x ^ 2 + (7 - point.x) ^ 2 + point.y ^ 2 + (7 - point.y) ^ 2
     end
     for dir = DIR_START, DIR_END do
         local loc = point + DIR_VECTORS[dir]
         if Board:IsValid(loc) then
-            -- 避免靠近危险地带
-            score = score + self:ScorePositioningAvoid(loc, pawn) * 0.15
             -- 累加靠近收益
             score = score + self:ScorePositioningApproach(loc, pawn)
         end
     end
-    if score <= -5 then
-        return score
-    end
 
     local custom = pawn:GetCustomPositionScore(point)
     if custom ~= 0 then
-        return custom
+        return custom * 10
     end
 
     local edge1 = point.x == 0 -- 不包括下边缘，否则敌人可能会消极应战
     local edge2 = point.y == 0 or point.y == 7
     if edge1 and edge2 then
-        score = score + 3 -- 鼓励到角落
+        score = score + 50 -- 鼓励到角落
     elseif edge1 or edge2 then
-        score = score + 2 -- 鼓励到边缘
+        score = score + 30 -- 鼓励到边缘
     end
 
-    score = score + (8 - point.x) * 0.2 -- 越深入建筑区分数越高
+    if not pawn:IsRanged() or pawn:IsJumper() or pawn:IsFlying() then
+        score = score + (7 - point.x) * 6 -- 越深入建筑区分数越高
+    else
+        score = score + 20
+    end
 
-    local close = false
+    local aggregate = false
     local approach = false
     local enemy = (pawn:GetTeam() == TEAM_PLAYER) and TEAM_ENEMY or TEAM_PLAYER
     local friend = (pawn:GetTeam() == TEAM_ENEMY) and TEAM_ENEMY or TEAM_PLAYER
     for i = DIR_START, DIR_END do
         if Board:IsPawnTeam(point + DIR_VECTORS[i], friend) then
-            close = true
+            aggregate = true
         end
         if not pawn:IsRanged() then -- 避免当近战法师（虽然 Ranged 并不全是远程）
             -- 尽量靠近更多建筑
             if Board:IsBuilding(point + DIR_VECTORS[i]) then
-                score = score + 1
+                score = score + 10
                 approach = true
-            elseif Board:IsPawnTeam(point + DIR_VECTORS[i], friend) then
+            elseif Board:IsPawnTeam(point + DIR_VECTORS[i], enemy) then
                 approach = true
             end
         end
     end
-    if close then
+    if aggregate then
         -- 聚集
-        score = score - 1.5
+        score = score - 30
     end
     if approach or pawn:IsRanged() then
         -- 避免消极应战
-        score = score + 5
+        score = score + 50
     end
 
     return score
@@ -291,31 +294,25 @@ function this:ScorePositioningAvoid(point, pawn)
     -- 数值需从小到大
     local terrain = Board:GetTerrain(point)
     if not pawn:IsFlying() and (terrain == TERRAIN_HOLE or terrain == TERRAIN_WATER) then
-        return -10
-    end
-    if Board:IsSmoke(point) then
-        return -10
-    end
-    if Board:IsAcid(point) then
-        return -10
-    end
-    if Board:IsFire(point) and not pawn:IsFire() then
-        return -10
-    end
-    if Board:IsSpawning(point) then
-        return -10
-    end
-    if Board:IsDangerous(point) then
-        return -10
-    end
-    if Board:IsDangerousItem(point) then
-        return -10
-    end
-    if self:IsEnvLocation(point) then
-        return -10
-    end
-    if Board:IsTargeted(point) then
-        return -5
+        return -100
+    elseif Board:IsSmoke(point) then
+        return -100
+    elseif Board:IsAcid(point) then
+        return -100
+    elseif Board:IsFire(point) and not pawn:IsFire() then
+        return -100
+    elseif Board:IsSpawning(point) then
+        return -100
+    elseif Board:IsDangerous(point) then
+        return -100
+    elseif Board:IsDangerousItem(point) then
+        return -100
+    elseif self:IsEnvLocation(point) then
+        return -100
+    elseif Board:IsPod(point) then
+        return -100
+    elseif Board:IsTargeted(point) then
+        return -50
     end
     return 0
 end
@@ -323,122 +320,185 @@ end
 -- 靠近区域（收益可正可负）
 function this:ScorePositioningApproach(point, pawn)
     local terrain = Board:GetTerrain(point)
-    if terrain == TERRAIN_MOUNTAIN then
-        return -0.5
+    if not pawn:IsFlying() and (terrain == TERRAIN_HOLE or terrain == TERRAIN_WATER) then
+        return -30
+    elseif Board:IsSpawning(point) then
+        return -20
+    elseif Board:IsSmoke(point) then
+        return -10
+    elseif Board:IsFire(point) and not pawn:IsFire() then
+        return -10
+    elseif Board:IsDangerous(point) then
+        return -10
+    elseif Board:IsDangerousItem(point) then
+        return -10
+    elseif self:IsEnvLocation(point) then
+        return -10
+    elseif Board:IsTargeted(point) then
+        return -10
+    elseif terrain == TERRAIN_MOUNTAIN then
+        return -10
+    elseif pawn:IsFlying() and (terrain == TERRAIN_HOLE or terrain == TERRAIN_WATER) then
+        return 5
+    elseif Board:IsPod(point) then
+        return 10
     end
-    if pawn:IsFlying() and (terrain == TERRAIN_HOLE or terrain == TERRAIN_WATER) then
-        return 0.5
+    return 0
+end
+
+function this:IsPawnEnableAI(pawn)
+    local mission = GetCurrentMission()
+    if mission then
+        -- 每个回合每个单位判断一次，该单位该回合总是使用 intelAI，或总是不使用 intelAI
+        local id = pawn:GetId()
+        if mission.intelAI_enableMap[id] == nil then
+            mission.intelAI_enableMap[id] = random_int(100) < self:GetFactor() * 100
+        end
+        if mission.intelAI_enableMap[id] then
+            return true
+        end
+    end
+    return false
+end
+
+function this:GetPositionScore(point, pawn)
+    if self:IsPawnEnableAI(pawn) then
+        return ScorePositioning(point, pawn) * this.positionFactor
     end
     return 0
 end
 
 local _Skill_ScoreList = Skill.ScoreList
 function Skill:ScoreList(list, queued, ...)
-    local mission = GetCurrentMission()
-    if mission then
-        -- 每个回合每个单位判断一次，该单位该回合总是使用 intelAI，或总是不使用 intelAI
-        local id = Pawn:GetId()
-        if mission.intelAI_enableMap[id] == nil then
-            mission.intelAI_enableMap[id] = random_int(100) < this:GetFactor() * 100
-        end
-        if mission.intelAI_enableMap[id] then
-            return this:Skill_ScoreList(self, list, queued)
-        end
+    if this:IsPawnEnableAI(Pawn) then
+        return this:Skill_ScoreList(self, list, queued)
     end
     return _Skill_ScoreList(self, list, queued, ...)
 end
 
 local _Skill_GetTargetScore = Skill.GetTargetScore
 function Skill:GetTargetScore(p1, p2)
-    local fx = self:GetSkillEffect(p1, p2)
+    if this:IsPawnEnableAI(Pawn) then
+        local fx = self:GetSkillEffect(p1, p2)
 
-    local queued_score = self:ScoreList(fx.q_effect, true)
-    local instant_score = self:ScoreList(fx.effect, false)
+        local queued_score = self:ScoreList(fx.q_effect, true)
+        local instant_score = self:ScoreList(fx.effect, false)
 
-    if instant_score < -20 then
-        return -100 -- don't do anything so horrible if it's instant
-    end
-    if fx.q_effect:empty() then
-        return instant_score
-    end
+        if instant_score < -200 then
+            return -100 -- don't do anything so horrible if it's instant
+        end
+        if fx.q_effect:empty() then
+            return instant_score
+        end
 
-    -- 缠绕应是强加分项
-    local grappleScore = 0
-    local instant = fx.effect
-    local meta = instant:GetMetadata()
-    for i = 1, instant:size() do
-        local grapple = meta[i] and meta[i].type == "grapple"
-        if grapple then
-            local target = meta[i].target or Point(-1, -1)
-            if Board:IsValid(target) then
-                grappleScore = grappleScore + this:Skill_ScoreList_Target(self, target, 0, true)
+        -- 缠绕应是强加分项
+        local grappleScore = 0
+        local instant = fx.effect
+        local meta = instant:GetMetadata()
+        for i = 1, instant:size() do
+            local grapple = meta[i] and meta[i].type == "grapple"
+            if grapple then
+                local target = meta[i].target or Point(-1, -1)
+                if Board:IsValid(target) then
+                    grappleScore = grappleScore + this:Skill_ScoreList_Target(self, target, 0, true)
+                end
             end
         end
-    end
 
-    this:LogTargetInfo(p2, queued_score, grappleScore)
-    return queued_score + grappleScore
-end
-
-local _BlobberAtk1_GetTargetScore
-function BlobberAtk1:GetTargetScore(p1, p2) -- 炸弹怪的智商太低，重写
-    local pos_score = ScorePositioning(p2, Pawn)
-    if pos_score < 0 then
-        return pos_score
-    end
-
-    local fx = SkillEffect()
-    local outerDamage = self.MyPawn == "Blob1" and 1 or 3
-    fx:AddQueuedDamage(SpaceDamage(p2, 2))
-    for i = DIR_START, DIR_END do
-        fx:AddQueuedDamage(SpaceDamage(p2 + DIR_VECTORS[i], outerDamage))
-    end
-    local score = self:ScoreList(fx.q_effect, true)
-
-    this:LogTargetInfo(p2, score, 0)
-    return score
-end
-
-local _SpiderAtk1_GetTargetScore
-function SpiderAtk1:GetTargetScore(p1, p2) -- 蜘蛛智商也不行，重写
-    local pos_score = ScorePositioning(p2, Pawn)
-    if pos_score < 0 then
-        return pos_score
-    end
-
-    local score = 0
-    for i = DIR_START, DIR_END do
-        local target = p2 + DIR_VECTORS[i]
-        if isEnemy(Board:GetPawnTeam(target), Pawn:GetTeam()) then
-            score = score + this:Skill_ScoreList_Target(self, target, 0, true)
-        elseif Board:GetPawnTeam(target) == Pawn:GetTeam() and not Board:IsFrozen(target) then
-            score = score + self.ScoreFriendlyDamage * 3
+        local positionScore = 0
+        local total = queued_score + grappleScore
+        if total > 0 then
+            positionScore = this:GetPositionScore(p1, Pawn)
         end
+        this:LogTargetInfo(p2, queued_score, grappleScore, positionScore)
+        return total + positionScore
     end
+    return _Skill_GetTargetScore(self, p1, p2)
+end
 
-    this:LogTargetInfo(p2, 0, score)
-    return score
+local _BlobberAtk1_GetTargetScore = BlobberAtk1.GetTargetScore
+function BlobberAtk1:GetTargetScore(p1, p2) -- 炸弹怪的智商太低，重写
+    if this:IsPawnEnableAI(Pawn) then
+        local pos_score = ScorePositioning(p2, Pawn)
+        if pos_score < 0 then
+            return pos_score
+        end
+
+        local fx = SkillEffect()
+        local outerDamage = self.MyPawn == "Blob1" and 1 or 3
+        fx:AddQueuedDamage(SpaceDamage(p2, 2))
+        for i = DIR_START, DIR_END do
+            fx:AddQueuedDamage(SpaceDamage(p2 + DIR_VECTORS[i], outerDamage))
+        end
+        local score = self:ScoreList(fx.q_effect, true)
+
+        local positionScore = 0
+        if score > 0 then
+            positionScore = this:GetPositionScore(p1, Pawn)
+        end
+        this:LogTargetInfo(p2, score, 0, positionScore)
+        return score + positionScore
+    end
+    return _BlobberAtk1_GetTargetScore(self, p1, p2)
+end
+
+local _SpiderAtk1_GetTargetScore = SpiderAtk1.GetTargetScore
+function SpiderAtk1:GetTargetScore(p1, p2) -- 蜘蛛智商也不行，重写
+    if this:IsPawnEnableAI(Pawn) then
+        local pos_score = ScorePositioning(p2, Pawn)
+        if pos_score < 0 then
+            return pos_score
+        end
+
+        local score = 0
+        for i = DIR_START, DIR_END do
+            local target = p2 + DIR_VECTORS[i]
+            if isEnemy(Board:GetPawnTeam(target), Pawn:GetTeam()) then
+                score = score + this:Skill_ScoreList_Target(self, target, 0, true)
+            elseif Board:GetPawnTeam(target) == Pawn:GetTeam() and not Board:IsFrozen(target) then
+                score = score + self.ScoreFriendlyDamage * 30
+            elseif Board:IsBuilding(target) then
+                score = score + self.ScoreBuilding * 5
+            end
+        end
+
+        local positionScore = 0
+        if score > 0 then
+            positionScore = this:GetPositionScore(p1, Pawn)
+        end
+        this:LogTargetInfo(p2, 0, score, positionScore)
+        return score + positionScore
+    end
+    return _SpiderAtk1_GetTargetScore(self, p1, p2)
+end
+
+local _CentipedeAtk1_GetTargetScore = CentipedeAtk1.GetTargetScore
+function CentipedeAtk1:GetTargetScore(p1, p2)
+    if this:IsPawnEnableAI(Pawn) then
+        local fx = SkillEffect()
+        if Board:GetPawnTeam(p2) == TEAM_ENEMY then
+            return -10
+        end
+
+        local score = self:ScoreList(self:GetSkillEffect(p1, p2).q_effect, true)
+        local positionScore = 0
+        if score > 0 then
+            positionScore = this:GetPositionScore(p1, Pawn)
+        end
+        this:LogTargetInfo(p2, score, 0, positionScore)
+        return score + positionScore
+    end
+    return _CentipedeAtk1_GetTargetScore(self, p1, p2)
 end
 
 local _ScorePositioning = ScorePositioning
 function ScorePositioning(point, pawn, ...)
-    local score = nil
-    local mission = GetCurrentMission()
-    if mission then
-        -- 每个回合每个单位判断一次，该单位该回合总是使用 intelAI，或总是不使用 intelAI
-        local id = pawn:GetId()
-        if mission.intelAI_enableMap[id] == nil then
-            mission.intelAI_enableMap[id] = random_int(100) < this:GetFactor() * 100
-        end
-        if mission.intelAI_enableMap[id] then
-            score = this:ScorePositioning(point, pawn)
-        end
+    if this:IsPawnEnableAI(pawn) then
+        local score = this:ScorePositioning(point, pawn)
+        this:LogPositionInfo(point, pawn, score)
+        return score
     end
-    if score == nil then
-        score = _ScorePositioning(point, pawn, ...)
-    end
-    this:LogPositionInfo(point, pawn, score)
-    return score
+    return _ScorePositioning(point, pawn, ...)
 end
 
 return this

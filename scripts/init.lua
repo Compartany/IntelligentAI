@@ -1,7 +1,7 @@
 local mod = {
     id = "IntelligentAI",
     name = "Intelligent AI",
-    version = "0.2.0.20211114",
+    version = "0.3.0.20211114",
     requirements = {"kf_ModUtils"},
     modApiVersion = "2.6.3",
     icon = "img/icon.png",
